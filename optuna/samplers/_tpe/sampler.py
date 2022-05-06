@@ -447,6 +447,7 @@ class TPESampler(BaseSampler):
                 # Just use the result sorted by the sum of constraints values.
                 indices_below = idx[: self._gamma(n)]
                 indices_above = idx[self._gamma(n) :]
+                indices_below = indices_below[constraints_1d[indices_below] == 0]
             else:
                 # All trials in below are feasible.
                 # Select which ones to put in below by objective func.
