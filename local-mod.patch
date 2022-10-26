@@ -1,0 +1,150 @@
+diff --git a/benchmarks/run_bayesmark.py b/benchmarks/run_bayesmark.py
+index 21ef38186..fcd232f6e 100644
+--- a/benchmarks/run_bayesmark.py
++++ b/benchmarks/run_bayesmark.py
+@@ -17,6 +17,9 @@ from xarray import Dataset
+ _DB = "bo_optuna_run"
+ 
+ 
++pd.set_option("display.max_columns", None)
++
++
+ def run_benchmark(args: argparse.Namespace) -> None:
+ 
+     sampler_list = args.sampler_list.split()
+@@ -25,9 +28,9 @@ def run_benchmark(args: argparse.Namespace) -> None:
+     pruner_kwargs_list = args.pruner_kwargs_list.split()
+ 
+     config = dict()
+-    for sampler, sampler_kwargs in zip(sampler_list, sampler_kwargs_list):
++    for i, (sampler, sampler_kwargs) in enumerate(zip(sampler_list, sampler_kwargs_list)):
+         for pruner, pruner_kwargs in zip(pruner_list, pruner_kwargs_list):
+-            optimizer_name = f"{sampler}-{pruner}"
++            optimizer_name = f"{sampler}-{pruner}-{i}"
+             optimizer_kwargs = {
+                 "sampler": sampler,
+                 "sampler_kwargs": json.loads(sampler_kwargs),
+@@ -51,6 +54,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
+         f"-c {args.model} -d {args.dataset} "
+         f"-m {metric} --opt-root benchmarks/bayesmark"
+     )
++    print(cmd)
+     subprocess.run(cmd, shell=True)
+ 
+ 
+@@ -58,12 +62,14 @@ def make_plots(args: argparse.Namespace) -> None:
+ 
+     filename = f"{args.dataset}-{args.model}-partial-report.json"
+     df = pd.read_json(os.path.join("partial", filename))
++    print(df)
+     summaries = (
+         df.groupby(["opt", "iter"])
+         .generalization.agg(["mean", "std"])
+         .rename(columns={"mean": "best_mean", "std": "best_std"})
+         .reset_index()
+     )
++    print(summaries)
+ 
+     fig, ax = plt.subplots()
+     fig.set_size_inches(12, 8)
+@@ -165,13 +171,15 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--dataset", type=str, default="iris")
+     parser.add_argument("--model", type=str, default="kNN")
+-    parser.add_argument("--budget", type=int, default=80)
+-    parser.add_argument("--n-runs", type=int, default=10)
+-    parser.add_argument("--sampler-list", type=str, default="TPESampler CmaEsSampler")
++    parser.add_argument("--budget", type=int, default=10)
++    parser.add_argument("--n-runs", type=int, default=4)
++    parser.add_argument(
++        "--sampler-list", type=str, default="RandomSampler TPESampler CmaEsSampler CmaEsSampler"
++    )
+     parser.add_argument(
+         "--sampler-kwargs-list",
+         type=str,
+-        default='{"multivariate":true,"constant_liar":true} {}',
++        default='{} {"multivariate":true,"constant_liar":true} {} {"use_cma_with_margin":true}',
+     )
+     parser.add_argument("--pruner-list", type=str, default="NopPruner")
+     parser.add_argument("--pruner-kwargs-list", type=str, default="{}")
+diff --git a/benchmarks/run_kurobako.py b/benchmarks/run_kurobako.py
+index 14edaf427..01aa349b1 100644
+--- a/benchmarks/run_kurobako.py
++++ b/benchmarks/run_kurobako.py
+@@ -55,9 +55,9 @@ def run(args: argparse.Namespace) -> None:
+             f"pruner_list: {pruner_list}, pruner_keyword_arguments: {pruner_kwargs_list}."
+         )
+ 
+-    for sampler, sampler_kwargs in zip(sampler_list, sampler_kwargs_list):
++    for i, (sampler, sampler_kwargs) in enumerate(zip(sampler_list, sampler_kwargs_list)):
+         for pruner, pruner_kwargs in zip(pruner_list, pruner_kwargs_list):
+-            name = f"{args.name_prefix}_{sampler}_{pruner}"
++            name = f"{args.name_prefix}_{sampler}_{pruner}_{i}"
+             cmd = (
+                 f"{kurobako_cmd} solver --name {name} optuna --loglevel debug "
+                 f"--sampler {sampler} --sampler-kwargs {sampler_kwargs} "
+@@ -96,15 +96,24 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--path-to-kurobako", type=str, default="")
+     parser.add_argument("--name-prefix", type=str, default="")
+-    parser.add_argument("--budget", type=int, default=80)
+-    parser.add_argument("--n-runs", type=int, default=100)
++    parser.add_argument("--budget", type=int, default=200)
++    parser.add_argument("--n-runs", type=int, default=1)
+     parser.add_argument("--n-jobs", type=int, default=10)
+     parser.add_argument("--n-concurrency", type=int, default=1)
+-    parser.add_argument("--sampler-list", type=str, default="RandomSampler TPESampler")
++    # parser.add_argument("--sampler-list", type=str, default="RandomSampler TPESampler CmaEsSampler CmaEsSampler")
++    # parser.add_argument(
++    #     "--sampler-kwargs-list",
++    #     type=str,
++    #     default=r"{} {\"multivariate\":true,\"constant_liar\":true} {} {\"use_cma_with_margin\":true}",
++    # )
++    parser.add_argument(
++        "--sampler-list", type=str, default="CmaEsSampler"
++    )
+     parser.add_argument(
+         "--sampler-kwargs-list",
+         type=str,
+-        default=r"{} {\"multivariate\":true\,\"constant_liar\":true}",
++        # default=r"{}",
++        default=r"{\"use_cma_with_margin\":true}",
+     )
+     parser.add_argument("--pruner-list", type=str, default="NopPruner")
+     parser.add_argument("--pruner-kwargs-list", type=str, default="{}")
+diff --git a/benchmarks/run_naslib.py b/benchmarks/run_naslib.py
+index bf4448a6e..824553e93 100644
+--- a/benchmarks/run_naslib.py
++++ b/benchmarks/run_naslib.py
+@@ -92,15 +92,15 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--path-to-kurobako", type=str, default="")
+     parser.add_argument("--name-prefix", type=str, default="")
+-    parser.add_argument("--budget", type=int, default=100)
++    parser.add_argument("--budget", type=int, default=80)
+     parser.add_argument("--n-runs", type=int, default=10)
+     parser.add_argument("--n-jobs", type=int, default=10)
+     parser.add_argument("--n-concurrency", type=int, default=1)
+-    parser.add_argument("--sampler-list", type=str, default="RandomSampler TPESampler")
++    parser.add_argument("--sampler-list", type=str, default="RandomSampler TPESampler CmaEsSampler CmaEsSampler")
+     parser.add_argument(
+         "--sampler-kwargs-list",
+         type=str,
+-        default=r"{} {\"multivariate\":true\,\"constant_liar\":true}",
++        default=r"{} {\"multivariate\":true,\"constant_liar\":true} {} {\"use_cma_with_margin\":true}",
+     )
+     parser.add_argument("--pruner-list", type=str, default="NopPruner")
+     parser.add_argument("--pruner-kwargs-list", type=str, default="{}")
+diff --git a/setup.py b/setup.py
+index ffa918855..84b1004b1 100644
+--- a/setup.py
++++ b/setup.py
+@@ -31,7 +31,7 @@ def get_install_requires() -> List[str]:
+     requirements = [
+         "alembic>=1.5.0",
+         "cliff",
+-        "cmaes@git+https://github.com/CyberAgentAILab/cmaes.git@9bdfb09d1a09611330066f0e2016eafeb6ce5a21",
++        "cmaes@git+https://github.com/CyberAgentAILab/cmaes.git@ce7daa7ece8761eb378c0c07aadd75781ebb3f79",
+         "colorlog",
+         "numpy",
+         "packaging>=20.0",
