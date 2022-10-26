@@ -1,0 +1,69 @@
+diff --git a/benchmarks/run_kurobako.py b/benchmarks/run_kurobako.py
+index 14edaf427..7fad865c8 100644
+--- a/benchmarks/run_kurobako.py
++++ b/benchmarks/run_kurobako.py
+@@ -55,9 +55,9 @@ def run(args: argparse.Namespace) -> None:
+             f"pruner_list: {pruner_list}, pruner_keyword_arguments: {pruner_kwargs_list}."
+         )
+ 
+-    for sampler, sampler_kwargs in zip(sampler_list, sampler_kwargs_list):
++    for i, (sampler, sampler_kwargs) in enumerate(zip(sampler_list, sampler_kwargs_list)):
+         for pruner, pruner_kwargs in zip(pruner_list, pruner_kwargs_list):
+-            name = f"{args.name_prefix}_{sampler}_{pruner}"
++            name = f"{args.name_prefix}_{sampler}_{pruner}_{i}"
+             cmd = (
+                 f"{kurobako_cmd} solver --name {name} optuna --loglevel debug "
+                 f"--sampler {sampler} --sampler-kwargs {sampler_kwargs} "
+@@ -96,16 +96,35 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--path-to-kurobako", type=str, default="")
+     parser.add_argument("--name-prefix", type=str, default="")
+-    parser.add_argument("--budget", type=int, default=80)
++    parser.add_argument("--budget", type=int, default=2000)
+     parser.add_argument("--n-runs", type=int, default=100)
+-    parser.add_argument("--n-jobs", type=int, default=10)
++    parser.add_argument("--n-jobs", type=int, default=8)
+     parser.add_argument("--n-concurrency", type=int, default=1)
+-    parser.add_argument("--sampler-list", type=str, default="RandomSampler TPESampler")
++    parser.add_argument(
++        "--sampler-list", type=str, default="RandomSampler TPESampler CmaEsSampler CmaEsSampler"
++    )
+     parser.add_argument(
+         "--sampler-kwargs-list",
+         type=str,
+-        default=r"{} {\"multivariate\":true\,\"constant_liar\":true}",
++        default=r"{} {\"multivariate\":true} {} {\"use_cma_with_margin\":true}",
+     )
++    # parser.add_argument(
++    #     "--sampler-list", type=str, default="CmaEsSampler CmaEsSampler"
++    # )
++    # parser.add_argument(
++    #     "--sampler-kwargs-list",
++    #     type=str,
++    #     default=r"{} {\"use_cma_with_margin\":true}",
++    # )
++    # parser.add_argument(
++    #     "--sampler-list", type=str, default="CmaEsSampler"
++    # )
++    # parser.add_argument(
++    #     "--sampler-kwargs-list",
++    #     type=str,
++    #     # default=r"{}",
++    #     default=r"{\"use_cma_with_margin\":true}",
++    # )
+     parser.add_argument("--pruner-list", type=str, default="NopPruner")
+     parser.add_argument("--pruner-kwargs-list", type=str, default="{}")
+     parser.add_argument("--seed", type=int, default=0)
+diff --git a/setup.py b/setup.py
+index ffa918855..84b1004b1 100644
+--- a/setup.py
++++ b/setup.py
+@@ -31,7 +31,7 @@ def get_install_requires() -> List[str]:
+     requirements = [
+         "alembic>=1.5.0",
+         "cliff",
+-        "cmaes@git+https://github.com/CyberAgentAILab/cmaes.git@9bdfb09d1a09611330066f0e2016eafeb6ce5a21",
++        "cmaes@git+https://github.com/CyberAgentAILab/cmaes.git@ce7daa7ece8761eb378c0c07aadd75781ebb3f79",
+         "colorlog",
+         "numpy",
+         "packaging>=20.0",
