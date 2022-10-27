@@ -25,9 +25,9 @@ def run_benchmark(args: argparse.Namespace) -> None:
     pruner_kwargs_list = args.pruner_kwargs_list.split()
 
     config = dict()
-    for sampler, sampler_kwargs in zip(sampler_list, sampler_kwargs_list):
+    for i, (sampler, sampler_kwargs) in enumerate(zip(sampler_list, sampler_kwargs_list)):
         for pruner, pruner_kwargs in zip(pruner_list, pruner_kwargs_list):
-            optimizer_name = f"{sampler}-{pruner}"
+            optimizer_name = f"{sampler}-{pruner}-{i}"
             optimizer_kwargs = {
                 "sampler": sampler,
                 "sampler_kwargs": json.loads(sampler_kwargs),
