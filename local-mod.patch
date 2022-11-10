@@ -1,0 +1,99 @@
+diff --git a/benchmarks/run_kurobako.py b/benchmarks/run_kurobako.py
+index 40f02b6de..78978b90e 100644
+--- a/benchmarks/run_kurobako.py
++++ b/benchmarks/run_kurobako.py
+@@ -93,7 +93,7 @@ def run(args: argparse.Namespace) -> None:
+     subprocess.run(cmd, shell=True)
+ 
+     cmd = (
+-        f"cat {result_filename} | {kurobako_cmd} plot curve --errorbar -o {args.out_dir} --xmin 10"
++        f"cat {result_filename} | {kurobako_cmd} plot curve --errorbar -o {args.out_dir} --xmin 50"
+     )
+     subprocess.run(cmd, shell=True)
+ 
+@@ -102,16 +102,34 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--path-to-kurobako", type=str, default="")
+     parser.add_argument("--name-prefix", type=str, default="")
+-    parser.add_argument("--budget", type=int, default=80)
++    parser.add_argument("--budget", type=int, default=2000)
+     parser.add_argument("--n-runs", type=int, default=100)
+-    parser.add_argument("--n-jobs", type=int, default=10)
++    parser.add_argument("--n-jobs", type=int, default=16)
+     parser.add_argument("--n-concurrency", type=int, default=1)
+-    parser.add_argument("--sampler-list", type=str, default="RandomSampler TPESampler")
++    # parser.add_argument(
++    #     "--sampler-list", type=str, default="QMCSampler RandomSampler TPESampler CmaEsSampler CmaEsSampler"
++    # )
++    # parser.add_argument(
++    #     "--sampler-kwargs-list",
++    #     type=str,
++    #     default=r"{} {} {\"multivariate\":true} {} {\"use_cma_with_margin\":true}",
++    # )
++    parser.add_argument(
++        "--sampler-list", type=str, default="RandomSampler CmaEsSampler CmaEsSampler"
++    )
+     parser.add_argument(
+         "--sampler-kwargs-list",
+         type=str,
+-        default=r"{} {\"multivariate\":true\,\"constant_liar\":true}",
++        default=r"{} {} {\"with_margin\":true}",
+     )
++    # parser.add_argument(
++    #     "--sampler-list", type=str, default="CmaEsSampler CmaEsSampler"
++    # )
++    # parser.add_argument(
++    #     "--sampler-kwargs-list",
++    #     type=str,
++    #     default=r"{} {\"use_cma_with_margin\":true}",
++    # )
+     parser.add_argument("--pruner-list", type=str, default="NopPruner")
+     parser.add_argument("--pruner-kwargs-list", type=str, default="{}")
+     parser.add_argument("--seed", type=int, default=0)
+diff --git a/docs/Makefile b/docs/Makefile
+index 1c59a8be3..a53e0d71b 100644
+--- a/docs/Makefile
++++ b/docs/Makefile
+@@ -2,7 +2,7 @@
+ #
+ 
+ # You can set these variables from the command line.
+-SPHINXOPTS    = -W --keep-going
++SPHINXOPTS    = -W --keep-going --nitpicky
+ SPHINXBUILD   = sphinx-build
+ SPHINXPROJ    = Optuna
+ SOURCEDIR     = source
+diff --git a/optuna/samplers/_cmaes.py b/optuna/samplers/_cmaes.py
+index f2753e719..45f65e037 100644
+--- a/optuna/samplers/_cmaes.py
++++ b/optuna/samplers/_cmaes.py
+@@ -180,6 +180,15 @@ class CmaEsSampler(BaseSampler):
+                 versions without prior notice. See
+                 https://github.com/optuna/optuna/releases/tag/v2.6.0.
+ 
++        with_margin:
++            If this is :obj:`True`, CMA-ES with margin is used.
++            Currently, this option cannot be used with ``use_separable_cma=True``.
++
++            .. note::
++                Added in v3.1.0 as an experimental feature. The interface may change in newer
++                versions without prior notice. See
++                https://github.com/optuna/optuna/releases/tag/v3.1.0.
++
+         source_trials:
+             This option is for Warm Starting CMA-ES, a method to transfer prior knowledge on
+             similar HPO tasks through the initialization of CMA-ES. This method estimates a
+diff --git a/tests/samplers_tests/test_cmaes.py b/tests/samplers_tests/test_cmaes.py
+index 56c419a30..ce222a02d 100644
+--- a/tests/samplers_tests/test_cmaes.py
++++ b/tests/samplers_tests/test_cmaes.py
+@@ -72,7 +72,8 @@ def test_init_cmaes_opts(
+ 
+ @pytest.mark.filterwarnings("ignore::optuna.exceptions.ExperimentalWarning")
+ @patch("optuna.samplers._cmaes.get_warm_start_mgd")
+-def test_warm_starting_cmaes(mock_func_ws: MagicMock) -> None:
++@pytest.mark.parametrize("with_margin", [False, True])
++def test_warm_starting_cmaes(with_margin: bool, mock_func_ws: MagicMock) -> None:
+     def objective(trial: optuna.Trial) -> float:
+         x = trial.suggest_float("x", -10, 10)
+         y = trial.suggest_float("y", -10, 10)
