@@ -1,0 +1,58 @@
+diff --git a/benchmarks/run_kurobako.py b/benchmarks/run_kurobako.py
+index 40f02b6de..c380a6558 100644
+--- a/benchmarks/run_kurobako.py
++++ b/benchmarks/run_kurobako.py
+@@ -102,15 +102,15 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--path-to-kurobako", type=str, default="")
+     parser.add_argument("--name-prefix", type=str, default="")
+-    parser.add_argument("--budget", type=int, default=80)
++    parser.add_argument("--budget", type=int, default=200)
+     parser.add_argument("--n-runs", type=int, default=100)
+-    parser.add_argument("--n-jobs", type=int, default=10)
++    parser.add_argument("--n-jobs", type=int, default=16)
+     parser.add_argument("--n-concurrency", type=int, default=1)
+-    parser.add_argument("--sampler-list", type=str, default="RandomSampler TPESampler")
++    parser.add_argument("--sampler-list", type=str, default="TPESampler TPESampler TPESampler")
+     parser.add_argument(
+         "--sampler-kwargs-list",
+         type=str,
+-        default=r"{} {\"multivariate\":true\,\"constant_liar\":true}",
++        default=r"{} {\"multivariate\":true\} {\"multivariate\":true\,\"mix\":true}",
+     )
+     parser.add_argument("--pruner-list", type=str, default="NopPruner")
+     parser.add_argument("--pruner-kwargs-list", type=str, default="{}")
+diff --git a/optuna/samplers/_tpe/sampler.py b/optuna/samplers/_tpe/sampler.py
+index d752fe7be..7cf180744 100644
+--- a/optuna/samplers/_tpe/sampler.py
++++ b/optuna/samplers/_tpe/sampler.py
+@@ -1,3 +1,4 @@
++import random
+ import math
+ from typing import Any
+ from typing import Callable
+@@ -245,6 +246,7 @@ class TPESampler(BaseSampler):
+         seed: Optional[int] = None,
+         *,
+         multivariate: bool = False,
++        mix: bool = False,
+         group: bool = False,
+         warn_independent_sampling: bool = True,
+         constant_liar: bool = False,
+@@ -270,6 +272,7 @@ class TPESampler(BaseSampler):
+         self._random_sampler = RandomSampler(seed=seed)
+ 
+         self._multivariate = multivariate
++        self._mix = mix
+         self._group = group
+         self._group_decomposed_search_space: Optional[_GroupDecomposedSearchSpace] = None
+         self._search_space_group: Optional[_SearchSpaceGroup] = None
+@@ -321,6 +324,8 @@ class TPESampler(BaseSampler):
+ 
+         if not self._multivariate:
+             return {}
++        if self._mix and random.random() < 0.1:
++            return {}
+ 
+         search_space: Dict[str, BaseDistribution] = {}
+ 
