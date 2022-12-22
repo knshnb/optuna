@@ -1,0 +1,38 @@
+diff --git a/benchmarks/run_kurobako.py b/benchmarks/run_kurobako.py
+index 40f02b6de..555ebe4c1 100644
+--- a/benchmarks/run_kurobako.py
++++ b/benchmarks/run_kurobako.py
+@@ -102,15 +102,15 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--path-to-kurobako", type=str, default="")
+     parser.add_argument("--name-prefix", type=str, default="")
+-    parser.add_argument("--budget", type=int, default=80)
++    parser.add_argument("--budget", type=int, default=2000)
+     parser.add_argument("--n-runs", type=int, default=100)
+-    parser.add_argument("--n-jobs", type=int, default=10)
++    parser.add_argument("--n-jobs", type=int, default=16)
+     parser.add_argument("--n-concurrency", type=int, default=1)
+-    parser.add_argument("--sampler-list", type=str, default="RandomSampler TPESampler")
++    parser.add_argument("--sampler-list", type=str, default="CmaEsSampler CmaEsSampler")
+     parser.add_argument(
+         "--sampler-kwargs-list",
+         type=str,
+-        default=r"{} {\"multivariate\":true\,\"constant_liar\":true}",
++        default=r"{} {\"with_margin\":true\}",
+     )
+     parser.add_argument("--pruner-list", type=str, default="NopPruner")
+     parser.add_argument("--pruner-kwargs-list", type=str, default="{}")
+diff --git a/setup.py b/setup.py
+index e9fd69755..ab6f4da12 100644
+--- a/setup.py
++++ b/setup.py
+@@ -29,7 +29,8 @@ def get_install_requires() -> List[str]:
+     # please update `test-with-lower` in `.github/workflows/tests.yml` as well.
+     requirements = [
+         "alembic>=1.5.0",
+-        "cmaes>=0.9.0",
++        # "cmaes>=0.9.0",
++        "cmaes@git+https://github.com/CyberAgentAILab/cmaes.git@refs/pull/134/head",
+         "colorlog",
+         "numpy",
+         "packaging>=20.0",
