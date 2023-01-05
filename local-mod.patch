@@ -1,0 +1,32 @@
+diff --git a/benchmarks/run_kurobako.py b/benchmarks/run_kurobako.py
+index 40f02b6de..46bb9f857 100644
+--- a/benchmarks/run_kurobako.py
++++ b/benchmarks/run_kurobako.py
+@@ -106,11 +106,11 @@ if __name__ == "__main__":
+     parser.add_argument("--n-runs", type=int, default=100)
+     parser.add_argument("--n-jobs", type=int, default=10)
+     parser.add_argument("--n-concurrency", type=int, default=1)
+-    parser.add_argument("--sampler-list", type=str, default="RandomSampler TPESampler")
++    parser.add_argument("--sampler-list", type=str, default="CmaEsSampler CmaEsSampler")
+     parser.add_argument(
+         "--sampler-kwargs-list",
+         type=str,
+-        default=r"{} {\"multivariate\":true\,\"constant_liar\":true}",
++        default=r"{} {\"with_margin\":true\}",
+     )
+     parser.add_argument("--pruner-list", type=str, default="NopPruner")
+     parser.add_argument("--pruner-kwargs-list", type=str, default="{}")
+diff --git a/setup.py b/setup.py
+index e9fd69755..84d296590 100644
+--- a/setup.py
++++ b/setup.py
+@@ -29,7 +29,8 @@ def get_install_requires() -> List[str]:
+     # please update `test-with-lower` in `.github/workflows/tests.yml` as well.
+     requirements = [
+         "alembic>=1.5.0",
+-        "cmaes>=0.9.0",
++        # "cmaes>=0.9.0",
++        "cmaes@git+https://github.com/knshnb/cmaes.git@c70716aa34a2d297e61f00e0bc0ce2cb8b99824b",
+         "colorlog",
+         "numpy",
+         "packaging>=20.0",
