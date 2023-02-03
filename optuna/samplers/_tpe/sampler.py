@@ -247,6 +247,7 @@ class TPESampler(BaseSampler):
         warn_independent_sampling: bool = True,
         constant_liar: bool = False,
         constraints_func: Optional[Callable[[FrozenTrial], Sequence[float]]] = None,
+        c_tpe: bool = False,
     ) -> None:
         self._parzen_estimator_parameters = _ParzenEstimatorParameters(
             consider_prior,
@@ -273,6 +274,7 @@ class TPESampler(BaseSampler):
         self._search_space = IntersectionSearchSpace(include_pruned=True)
         self._constant_liar = constant_liar
         self._constraints_func = constraints_func
+        self._c_tpe = c_tpe
 
         if multivariate:
             warnings.warn(
@@ -369,6 +371,22 @@ class TPESampler(BaseSampler):
         else:
             return self._sample_relative(study, trial, search_space)
 
+    def compute_probability_improvement(
+        self,
+        samples: Dict[str, np.ndarray],
+        mpe_below: _ParzenEstimator,
+        mpe_above: _ParzenEstimator,
+        percentile: float,
+    ) -> np.ndarray:
+        log_likelihoods_below = mpe_below.log_pdf(samples)
+        log_likelihoods_above = mpe_above.log_pdf(samples)
+        first_term = np.log(percentile + EPS)
+        second_term = (
+            np.log(1.0 - percentile + EPS) + log_likelihoods_above - log_likelihoods_below
+        )
+        pi = -np.logaddexp(first_term, second_term)
+        return pi
+
     def _sample_relative(
         self, study: Study, trial: FrozenTrial, search_space: Dict[str, BaseDistribution]
     ) -> Dict[str, Any]:
@@ -446,7 +464,24 @@ class TPESampler(BaseSampler):
                 study, trial, param_name, param_distribution
             )
 
-        indices_below, indices_above = _split_observation_pairs(scores, self._gamma(n), violations)
+        if self._c_tpe:
+            # TODO(knshnb): Remove binary search.
+            assert violations is not None
+            is_feasible = np.array([v <= 0 for v in violations])
+            ok, ng = n, self._gamma(n) - 1
+            while abs(ok - ng) > 1:
+                mid = (ok + ng) // 2
+                indices_below, indices_above = _split_observation_pairs(scores, mid, None)
+                if is_feasible[indices_below].sum() >= self._gamma(n):
+                    ok = mid
+                else:
+                    ng = mid
+            indices_below, indices_above = _split_observation_pairs(scores, ok, None)
+            # assert is_feasible[indices_below].sum() == self._gamma(n)
+        else:
+            indices_below, indices_above = _split_observation_pairs(
+                scores, self._gamma(n), violations
+            )
         # `None` items are intentionally converted to `nan` and then filtered out.
         # For `nan` conversion, the dtype must be float.
         config_value = np.asarray(values[param_name], dtype=float)
@@ -473,6 +508,36 @@ class TPESampler(BaseSampler):
             above, {param_name: param_distribution}, self._parzen_estimator_parameters
         )
         samples_below = mpe_below.sample(self._rng, self._n_ei_candidates)
+        if self._c_tpe:
+            percentile = len(indices_below) / (len(indices_below) + len(indices_above))
+            pi = self.compute_probability_improvement(
+                samples_below, mpe_below, mpe_above, percentile
+            )
+            trials = study.get_trials(
+                deepcopy=False, states=(TrialState.COMPLETE, TrialState.PRUNED)
+            )
+            violation_vec = np.array(
+                [trial.system_attrs.get(_CONSTRAINTS_KEY) for trial in trials]
+            )
+            for constraint_idx in range(violation_vec.shape[1]):
+                feasible_mask = violation_vec[:, constraint_idx] <= 0
+                below = {param_name: config_value[feasible_mask]}
+                above = {param_name: config_value[~feasible_mask]}
+                mpe_below = _ParzenEstimator(
+                    below, {param_name: param_distribution}, self._parzen_estimator_parameters
+                )
+                mpe_above = _ParzenEstimator(
+                    above, {param_name: param_distribution}, self._parzen_estimator_parameters
+                )
+                percentile = feasible_mask.sum() / len(trials)
+                pi += self.compute_probability_improvement(
+                    samples_below, mpe_below, mpe_above, percentile
+                )
+
+            best_idx = np.argmax(pi)
+            ret = {k: v[best_idx].item() for k, v in samples_below.items()}
+            return param_distribution.to_external_repr(ret[param_name])
+
         log_likelihoods_below = mpe_below.log_pdf(samples_below)
         log_likelihoods_above = mpe_above.log_pdf(samples_below)
         ret = TPESampler._compare(samples_below, log_likelihoods_below, log_likelihoods_above)
