@@ -521,6 +521,9 @@ class TPESampler(BaseSampler):
             )
             for constraint_idx in range(violation_vec.shape[1]):
                 feasible_mask = violation_vec[:, constraint_idx] <= 0
+                if feasible_mask.sum() == 0:
+                    min_idx = violation_vec[:, constraint_idx].argmin()
+                    feasible_mask[min_idx] = True
                 below = {param_name: config_value[feasible_mask]}
                 above = {param_name: config_value[~feasible_mask]}
                 mpe_below = _ParzenEstimator(
